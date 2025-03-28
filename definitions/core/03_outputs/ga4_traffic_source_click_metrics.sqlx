@@ -51,7 +51,7 @@ HyperskillClicks AS (
     ${ref("ga4_events")}
   WHERE
     event_name LIKE '%card_click%'
-    AND event_params.click_link LIKE '%hyperskill.org%'
+    AND event_params_custom.click_link LIKE '%hyperskill.org%'
 ),
 JetBrainsClicks AS (
   -- Second card_click condition: academy.jetbrains.com/course/ or plugins.jetbrains.com
@@ -63,8 +63,8 @@ JetBrainsClicks AS (
   WHERE
     event_name LIKE '%card_click%'
     AND (
-      REGEXP_CONTAINS(event_params.click_link, r'academy\.jetbrains\.com/course/') OR
-      REGEXP_CONTAINS(event_params.click_link, r'plugins\.jetbrains\.com')
+      REGEXP_CONTAINS(event_params_custom.click_link, r'academy\.jetbrains\.com/course/') OR
+      REGEXP_CONTAINS(event_params_custom.click_link, r'plugins\.jetbrains\.com')
     )
 )
 
