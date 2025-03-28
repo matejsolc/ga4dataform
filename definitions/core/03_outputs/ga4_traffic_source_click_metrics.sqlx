@@ -1,8 +1,10 @@
 config {
   type: "table",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   description: "Analyzes traffic sources with landing pages and specific clicks",
   tags: ["analytics", "traffic_source", "landing_page", "ga4"]
 }
+
 
 WITH SessionSourcesAndLanding AS (
   -- Get both traffic source and landing page for each session
