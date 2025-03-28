@@ -1,9 +1,9 @@
-defaultAssertionDataset: poc_jetbrains
+defaultAssertionDataset: ga4_dataform
 defaultLocation: EU
-defaultProject: test-internal-368519
+defaultProject: ga4-export-349907
 vars:
   GA4_DATASET: analytics_314592805
   LOCAL_TIMEZONE: Europe/Paris
-  QUALITY_DATASET: poc_jetbrains
-  TRANSFORMATIONS_DATASET: poc_jetbrains
-  OUTPUTS_DATASET: poc_jetbrains
+  QUALITY_DATASET: ga4_dataform
+  TRANSFORMATIONS_DATASET: ga4_dataform
+  OUTPUTS_DATASET: ga4_dataform
