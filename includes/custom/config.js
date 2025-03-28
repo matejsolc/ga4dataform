@@ -56,7 +56,10 @@ const customConfig = {
   //    { name: "event_value", type: "decimal" },
   //    { name: "event_value", type: "string", renameTo: "event_value_string" }
   // ],
-  CUSTOM_EVENT_PARAMS_ARRAY: [],
+  CUSTOM_EVENT_PARAMS_ARRAY: [
+    { name: "click_link", type: "string" },
+
+  ],
 
   // user properties
   // example:
