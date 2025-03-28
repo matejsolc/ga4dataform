@@ -1,6 +1,6 @@
-defaultAssertionDataset: superform_assertion
+defaultAssertionDataset: poc_jetbrains
 defaultLocation: EU
-defaultProject: dataform-package
+defaultProject: test-internal-368519
 vars:
   GA4_DATASET: analytics_314592805
   LOCAL_TIMEZONE: Europe/Paris
