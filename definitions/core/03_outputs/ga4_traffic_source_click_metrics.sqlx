@@ -1,0 +1,116 @@
+config {
+  type: "table",
+  description: "Analyzes traffic sources with landing pages and specific clicks",
+  tags: ["analytics", "traffic_source", "landing_page", "ga4"]
+}
+
+WITH SessionSourcesAndLanding AS (
+  -- Get both traffic source and landing page for each session
+  SELECT
+    session_id,
+    session_date,  -- This will be used to join with event dates
+    -- Landing page information
+    landing_page.landing_page_path AS landing_page_path,
+    -- Traffic source fields
+    session_source.source AS traffic_source,
+    session_source.medium AS traffic_medium,
+    session_source.campaign AS traffic_campaign,
+    session_source.default_channel_grouping AS channel_grouping,
+    -- Combine source and medium (standard practice in GA analysis)
+    CONCAT(
+      COALESCE(session_source.source, '(not set)'), 
+      ' / ', 
+      COALESCE(session_source.medium, '(not set)')
+    ) AS source_medium
+  FROM
+    ${ref("ga4_sessions")}
+  WHERE
+    session_id IS NOT NULL
+),
+PageViewEvents AS (
+  -- Filter events for page_view events only
+  SELECT
+    session_id,
+    event_date,  -- Include event_date for the join
+    event_name,
+    page.path AS page_path
+  FROM
+    ${ref("ga4_events")}
+  WHERE
+    event_name = 'page_view'
+    AND session_id IS NOT NULL
+),
+HyperskillClicks AS (
+  -- First card_click condition: hyperskill.org links
+  SELECT
+    session_id,
+    event_date  -- Include event_date for the join
+  FROM
+    ${ref("ga4_events")}
+  WHERE
+    event_name LIKE '%card_click%'
+    AND event_params.click_link LIKE '%hyperskill.org%'
+),
+JetBrainsClicks AS (
+  -- Second card_click condition: academy.jetbrains.com/course/ or plugins.jetbrains.com
+  SELECT
+    session_id,
+    event_date  -- Include event_date for the join
+  FROM
+    ${ref("ga4_events")}
+  WHERE
+    event_name LIKE '%card_click%'
+    AND (
+      REGEXP_CONTAINS(event_params.click_link, r'academy\.jetbrains\.com/course/') OR
+      REGEXP_CONTAINS(event_params.click_link, r'plugins\.jetbrains\.com')
+    )
+)
+
+-- Join all tables and count various metrics
+SELECT
+  s.landing_page_path,
+  s.traffic_source,
+  s.traffic_medium,
+  s.traffic_campaign,
+  s.channel_grouping,
+  s.source_medium,
+
+  -- Session and page view counts
+  COUNT(DISTINCT s.session_id) AS session_count,
+  COUNT(e.page_path) AS page_view_count,
+  ROUND(COUNT(e.page_path) / NULLIF(COUNT(DISTINCT s.session_id), 0), 2) AS avg_page_views_per_session,
+
+  -- New counts for specific link clicks
+  COUNT(DISTINCT h.session_id) AS hyperskill_click_count,
+  COUNT(DISTINCT j.session_id) AS jetbrains_click_count,
+
+  -- Conversion rates for the specific clicks
+  ROUND(COUNT(DISTINCT h.session_id) / NULLIF(COUNT(DISTINCT s.session_id), 0) * 100, 2) AS hyperskill_click_rate,
+  ROUND(COUNT(DISTINCT j.session_id) / NULLIF(COUNT(DISTINCT s.session_id), 0) * 100, 2) AS jetbrains_click_rate
+FROM
+  SessionSourcesAndLanding s
+LEFT JOIN
+  PageViewEvents e
+ON
+  s.session_id = e.session_id
+  AND s.session_date = e.event_date  -- Join on both session_id and date
+LEFT JOIN
+  HyperskillClicks h
+ON
+  s.session_id = h.session_id
+  AND s.session_date = h.event_date  -- Join on both session_id and date
+LEFT JOIN
+  JetBrainsClicks j
+ON
+  s.session_id = j.session_id
+  AND s.session_date = j.event_date  -- Join on both session_id and date
+GROUP BY
+  s.landing_page_path,
+  s.traffic_source,
+  s.traffic_medium,
+  s.traffic_campaign,
+  s.channel_grouping,
+  s.source_medium
+ORDER BY
+  s.landing_page_path,
+  page_view_count DESC
