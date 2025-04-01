@@ -1,15 +1,17 @@
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   description: "Analyzes traffic sources with landing pages and specific clicks",
-  tags: ["analytics", "traffic_source", "landing_page", "ga4"]
+  bigquery: {
+    partitionBy: "session_date",
+  }
 }
-
 
 WITH SessionSourcesAndLanding AS (
   -- Get both traffic source and landing page for each session
   SELECT
     session_id,
+    user_pseudo_id,
     session_date,  -- This will be used to join with event dates
     -- Landing page information
     landing_page.landing_page_path AS landing_page_path,
@@ -35,6 +37,7 @@ PageViewEvents AS (
     session_id,
     event_date,  -- Include event_date for the join
     event_name,
+    event_params_custom.page AS page_custom,
     page.path AS page_path
   FROM
     ${ref("ga4_events")}
@@ -46,7 +49,9 @@ HyperskillClicks AS (
   -- First card_click condition: hyperskill.org links
   SELECT
     session_id,
-    event_date  -- Include event_date for the join
+    event_date,  -- Include event_date for the join
+    event_params_custom.page AS page_custom,
+    page.path AS page_path
   FROM
     ${ref("ga4_events")}
   WHERE
@@ -57,7 +62,9 @@ JetBrainsClicks AS (
   -- Second card_click condition: academy.jetbrains.com/course/ or plugins.jetbrains.com
   SELECT
     session_id,
-    event_date  -- Include event_date for the join
+    event_date,  -- Include event_date for the join
+    event_params_custom.page AS page_custom,
+    page.path AS page_path
   FROM
     ${ref("ga4_events")}
   WHERE
@@ -70,6 +77,7 @@ JetBrainsClicks AS (
 
 -- Join all tables and count various metrics
 SELECT
+  s.session_date,
   s.landing_page_path,
   s.traffic_source,
   s.traffic_medium,
@@ -80,6 +88,7 @@ SELECT
   -- Session and page view counts
   COUNT(DISTINCT s.session_id) AS session_count,
   COUNT(e.page_path) AS page_view_count,
+  COUNT(DISTINCT s.user_pseudo_id) AS users_count,
   ROUND(COUNT(e.page_path) / NULLIF(COUNT(DISTINCT s.session_id), 0), 2) AS avg_page_views_per_session,
 
   -- New counts for specific link clicks
@@ -106,13 +115,4 @@ LEFT JOIN
 ON
   s.session_id = j.session_id
   AND s.session_date = j.event_date  -- Join on both session_id and date
-GROUP BY
-  s.landing_page_path,
-  s.traffic_source,
-  s.traffic_medium,
-  s.traffic_campaign,
-  s.channel_grouping,
-  s.source_medium
-ORDER BY
-  s.landing_page_path,
-  page_view_count DESC
+GROUP BY ALL

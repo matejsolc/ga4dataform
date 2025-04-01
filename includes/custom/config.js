@@ -58,6 +58,7 @@ const customConfig = {
   // ],
   CUSTOM_EVENT_PARAMS_ARRAY: [
     { name: "click_link", type: "string" },
+    { name: "page", type: "string" },
 
   ],
 
