@@ -1,0 +1,54 @@
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  description: "Analyzes traffic sources with landing pages and specific clicks",
+  bigquery: {
+    partitionBy: "event_date",
+  }
+}
+
+WITH
+  PageViewsEvents AS (
+  SELECT
+    event_date,
+    event_name,
+    user_pseudo_id,
+    session_id,
+    event_params_custom.page AS custom_page,
+    event_params_custom.click_link AS click_link,
+
+    -- Create flags for each type of click
+    CASE WHEN event_name LIKE '%card_click%' AND event_params_custom.click_link LIKE '%hyperskill.org%' 
+         THEN 1 ELSE 0 END AS is_hyperskill_click,
+         
+    CASE WHEN event_name LIKE '%card_click%' AND 
+                (REGEXP_CONTAINS(event_params_custom.click_link, r'academy\.jetbrains\.com/course/') OR
+                 REGEXP_CONTAINS(event_params_custom.click_link, r'plugins\.jetbrains\.com'))
+         THEN 1 ELSE 0 END AS is_jetbrains_click
+
+
+  FROM
+    ${ref("ga4_events")}
+  WHERE
+    (event_name = 'page_view' OR event_name LIKE '%card_click%')
+    AND page IS NOT NULL 
+  )
+
+SELECT
+  event_date,
+  custom_page AS page,
+  -- Page views (count and users)
+  SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_view_count,
+  COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN user_pseudo_id ELSE NULL END) AS user_count,
+  
+  -- Hyperskill clicks (count and users)
+  SUM(is_hyperskill_click) AS hyperskill_click_count,
+  COUNT(DISTINCT CASE WHEN is_hyperskill_click = 1 THEN user_pseudo_id ELSE NULL END) AS hyperskill_click_users,
+  
+  -- JetBrains clicks (count and users)
+  SUM(is_jetbrains_click) AS jetbrains_click_count,
+  COUNT(DISTINCT CASE WHEN is_jetbrains_click = 1 THEN user_pseudo_id ELSE NULL END) AS jetbrains_click_users,
+
+FROM
+  PageViewsEvents
+GROUP BY ALL
