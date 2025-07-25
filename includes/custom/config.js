@@ -59,6 +59,9 @@ const customConfig = {
   CUSTOM_EVENT_PARAMS_ARRAY: [
     { name: "click_link", type: "string" },
     { name: "page", type: "string" },
+    { name: "customer_type", type: "string" },
+    { name: "coupon", type: "string" },
+    { name: "quote_ID", type: "string" },
 
   ],
 
