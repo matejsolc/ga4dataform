@@ -1,15 +1,13 @@
 config {
   type: "view",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
-  description: "Custom channel grouping with Direct vs Unassigned distinction using GA4's cross_channel_campaign fields",
+  description: "Extends ga4_events with custom channel grouping logic that distinguishes Direct from Unassigned traffic. Adds 3 new fields: custom_channel_grouping (Direct/Unassigned/existing channels), traffic_attribution_status (detailed attribution analysis), and custom_source_medium (consolidated source/medium pairs).",
+  disabled: false
 }
 
 SELECT
   -- Include all original fields
-  * EXCEPT(session_source),
-  
-  -- Keep original session_source but add custom channel grouping
-  session_source,
+  *,
   
   -- Custom channel grouping logic that distinguishes Direct from Unassigned
   CASE
@@ -23,10 +21,16 @@ SELECT
      AND session_traffic_source_last_click.cross_channel_campaign.medium = '(not set)'
     THEN 'Unassigned'
     
+    -- Custom Email detection including Marketo (based on helper function pattern)
+    WHEN regexp_contains(COALESCE(session_traffic_source_last_click.cross_channel_campaign.medium, ''), r"email|e-mail|e_mail|e mail|newsletter|marketo")
+      OR regexp_contains(COALESCE(session_traffic_source_last_click.cross_channel_campaign.source, ''), r"email|e-mail|e_mail|e mail|newsletter|marketo")
+      OR regexp_contains(COALESCE(fixed_traffic_source.medium, ''), r"email|e-mail|e_mail|e mail|newsletter|marketo")
+      OR regexp_contains(COALESCE(fixed_traffic_source.source, ''), r"email|e-mail|e_mail|e mail|newsletter|marketo")
+    THEN 'Email'
+    
     -- Fall back to existing default channel grouping for all other cases
     ELSE COALESCE(
-      session_source.first.default_channel_grouping,
-      session_source.last.default_channel_grouping,
+      session_traffic_source_last_click.cross_channel_campaign.default_channel_group,
       '(Other)'
     )
   END AS custom_channel_grouping,
