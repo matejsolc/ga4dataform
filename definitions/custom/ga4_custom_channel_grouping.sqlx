@@ -1,0 +1,76 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  description: "Custom channel grouping with Direct vs Unassigned distinction using GA4's cross_channel_campaign fields",
+}
+
+SELECT
+  -- Include all original fields
+  * EXCEPT(session_source),
+  
+  -- Keep original session_source but add custom channel grouping
+  session_source,
+  
+  -- Custom channel grouping logic that distinguishes Direct from Unassigned
+  CASE
+    -- True Direct: GA4 explicitly marks as direct via cross_channel_campaign
+    WHEN session_traffic_source_last_click.cross_channel_campaign.source = 'direct' 
+     AND session_traffic_source_last_click.cross_channel_campaign.medium = '(none)'
+    THEN 'Direct'
+    
+    -- Unassigned: source/medium are (not set) - missing attribution
+    WHEN session_traffic_source_last_click.cross_channel_campaign.source = '(not set)'
+     AND session_traffic_source_last_click.cross_channel_campaign.medium = '(not set)'
+    THEN 'Unassigned'
+    
+    -- Fall back to existing default channel grouping for all other cases
+    ELSE COALESCE(
+      session_source.first.default_channel_grouping,
+      session_source.last.default_channel_grouping,
+      '(Other)'
+    )
+  END AS custom_channel_grouping,
+  
+  -- Additional traffic attribution status for detailed analysis
+  CASE
+    -- True Direct from GA4's perspective
+    WHEN session_traffic_source_last_click.cross_channel_campaign.source = 'direct' 
+     AND session_traffic_source_last_click.cross_channel_campaign.medium = '(none)'
+    THEN 'True Direct'
+    
+    -- Unassigned traffic (not set values)
+    WHEN session_traffic_source_last_click.cross_channel_campaign.source = '(not set)'
+     AND session_traffic_source_last_click.cross_channel_campaign.medium = '(not set)'
+    THEN 'Unassigned'
+    
+    -- Legacy direct detection (from fixed_traffic_source)
+    WHEN fixed_traffic_source.source = 'direct' 
+     AND fixed_traffic_source.medium = 'none'
+    THEN 'Legacy Direct'
+    
+    -- Has source attribution
+    WHEN has_source = true
+    THEN 'Attributed'
+    
+    -- No source but not explicitly direct or unassigned
+    ELSE 'No Attribution'
+  END AS traffic_attribution_status,
+  
+  -- Consolidated source/medium for easier analysis
+  CASE
+    WHEN session_traffic_source_last_click.cross_channel_campaign.source = 'direct' 
+     AND session_traffic_source_last_click.cross_channel_campaign.medium = '(none)'
+    THEN 'direct / (none)'
+    
+    WHEN session_traffic_source_last_click.cross_channel_campaign.source = '(not set)'
+     AND session_traffic_source_last_click.cross_channel_campaign.medium = '(not set)'
+    THEN '(not set) / (not set)'
+    
+    ELSE CONCAT(
+      COALESCE(fixed_traffic_source.source, '(not set)'),
+      ' / ',
+      COALESCE(fixed_traffic_source.medium, '(not set)')
+    )
+  END AS custom_source_medium
+
+FROM ${ref("ga4_events")}
